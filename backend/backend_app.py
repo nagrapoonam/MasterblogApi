@@ -1,63 +1,106 @@
+# using Flask to handle HTTP requests, create JSON responses, and access data from incoming requests.
 from flask import Flask, jsonify, request
+# allowing cross-origin requests from any domain to access API endpoints.
 from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__)  # Initializing a Flask application instance
 CORS(app)  # This will enable CORS for all routes
 
+# a list of dictionaries representing blog posts
 POSTS = [
-    {"id": 1, "title": "First post", "content": "This is the first post."},
-    {"id": 2, "title": "Second post", "content": "This is the second post."},
-    {"id": 3, "title": "Third post", "content": "This is the third post."},
-    {"id": 4, "title": "First post", "content": "This is the tenth post."},
-    {"id": 5, "title": "Fifth post", "content": "This is the fifth post."},
-    {"id": 6, "title": "Sixth post", "content": "This is the sixth post."},
-    {"id": 7, "title": "First post", "content": "This is the aseventh post."},
+    {"id": 1, "title": "7First post", "content": "1This is the first post."},
+    {"id": 2, "title": "6Second post", "content": "2This is the second post."},
+    {"id": 3, "title": "5Third post", "content": "3This is the third post."},
+    {"id": 4, "title": "4First post", "content": "4This is the tenth post."},
+    {"id": 5, "title": "3Fifth post", "content": "5This is the fifth post."},
+    {"id": 6, "title": "2Sixth post", "content": "6This is the sixth post."},
+    {"id": 7, "title": "1First post", "content": "7This is the aseventh post."},
 
 ]
 
 
+# handles GET requests to the /api/posts endpoint for retrieving a list of blog posts
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
-    return jsonify(POSTS)
+    # Get the sort and direction query parameters
+    sort_field = request.args.get('sort')
+    direction = request.args.get('direction')
+
+    # Check if sort_field and direction are provided
+    if sort_field and direction:
+        # Check if sort_field is valid
+        if sort_field not in ['title', 'content']:
+            response = {
+                'error': 'Invalid sort field.',
+                'valid_fields': ['title', 'content']
+            }
+            return jsonify(response), 400
+
+        # Check if direction is valid
+        if direction not in ['asc', 'desc']:
+            response = {
+                'error': 'Invalid sort direction.',
+                'valid_directions': ['asc', 'desc']
+            }
+            return jsonify(response), 400
+
+        # Sort the posts based on the provided parameters
+        sorted_posts = sorted(POSTS, key=lambda post: post.get(sort_field, ''),
+                              reverse=(direction == 'desc'))
+
+        return jsonify(sorted_posts)
+    else:
+        # No sort parameters provided, return the original order of posts
+        return jsonify(POSTS)
 
 
+# handles HTTP POST requests to the /api/posts endpoint for creating new blog posts
 @app.route('/api/posts', methods=['POST'])
 def create_post():
-    data = request.get_json()
-    title = data.get('title')
-    content = data.get('content')
+    """function handles the creation of new blog posts by extracting the title and content from the request JSON,
+    validating the data, generating a unique ID, adding the new post to the POSTS list,
+    and returning the created post as a JSON response"""
+    data = request.get_json()  # extract the JSON data
+    title = data.get('title')  # retrieve the value of the 'title'
+    content = data.get('content')  # retrieve the value of the 'content'
 
+    # checks if both the title and content are missing
     if not title and not content:
         response = {
             'error': 'Both title and content are missing.',
             'missing_fields': ['title', 'content']
         }
         return jsonify(response), 400
-    elif not title:
+    elif not title:  # check if title is missing
         response = {
             'error': 'Title is missing.',
             'missing_fields': ['title']
         }
         return jsonify(response), 400
-    elif not content:
+    elif not content:  # check if content is missing
         response = {
             'error': 'Content is missing.',
             'missing_fields': ['content']
         }
         return jsonify(response), 400
 
+    # creates a new dictionary new_post with an ID, title, and content based on the provided title and content variables.
     new_post = {
         'id': len(POSTS) + 1,  # Generate a new unique ID
         'title': title,
         'content': content
     }
-    POSTS.append(new_post)
+    POSTS.append(new_post)  # adding a new blog post to the list
 
+    # returns the new_post dictionary as a JSON response with a status code of 201 Created
     return jsonify(new_post), 201
 
 
+# handles HTTP DELETE requests to the /api/posts/<id> endpoint for deleting a specific blog post based on its ID
 @app.route('/api/posts/<int:id>', methods=['DELETE'])
 def delete_post(id):
+    """ function handles the deletion of a specific blog post based on its ID by searching for the post in the POSTS list,
+    removing it if found, and returning a JSON response indicating the success or failure of the deletion operation"""
     post_index = None
     for index, post in enumerate(POSTS):
         if post['id'] == id:
@@ -77,8 +120,13 @@ def delete_post(id):
     return jsonify(response), 200
 
 
+# handles HTTP PUT requests to the /api/posts/<id> endpoint for updating a specific blog post based on its ID
 @app.route('/api/posts/<int:id>', methods=['PUT'])
 def update_post(id):
+    """ function handles the update of a specific blog post based on its ID by retrieving the new title and content from the request JSON,
+     finding the post in the POSTS list,
+     updating its fields if found, and
+     returning the updated post as a JSON response"""
     data = request.get_json()
     new_title = data.get('title')
     new_content = data.get('content')
@@ -108,8 +156,12 @@ def update_post(id):
     return jsonify(updated_post), 200
 
 
+# handles HTTP GET requests to the /api/posts/search endpoint for searching blog posts based on specified search criteria
 @app.route('/api/posts/search', methods=['GET'])
 def search_posts():
+    """function handles the search for blog posts based on the provided title and/or content search criteria,
+    returning a JSON response containing the matched posts.
+    If no search criteria are provided, an empty response is returned"""
     title = request.args.get('title')
     content = request.args.get('content')
 
@@ -126,70 +178,7 @@ def search_posts():
     return jsonify(matched_posts)
 
 
-
-@app.route('/api/posts', methods=['GET'])
-def sorted_posts():
-    sort = request.args.get('sort')
-    direction = request.args.get('direction')
-
-    # Sorting logic
-    if sort not in ['title', 'content']:
-        return jsonify({'error': 'Invalid sort field'}), 400
-
-    if direction not in ['asc', 'desc']:
-        return jsonify({'error': 'Invalid sort direction'}), 400
-
-    sorted_posts = sorted(POSTS, key=lambda p: p[sort].lower(),
-                          reverse=(direction == 'desc'))
-
-    # Return the sorted posts
-    return jsonify({'posts': sorted_posts})
-
-
-# @app.route('/api/posts/print', methods=['GET'])
-# def sorted_posts():
-#
-#     search_content = request.args.get('search_content')
-#     order = request.args.get('order')
-#
-#     # Filter the posts based on the search content
-#     filtered_posts = [post for post in POSTS if search_content.lower() in post['title'].lower() or search_content.lower() in post['content'].lower()]
-#
-#     # Sort the filtered posts by ID
-#     sorted_posts = sorted(filtered_posts, key=lambda x: x['id'], reverse=(order == "descending"))
-#
-#     # Prepare the response
-#     response = []
-#     for post in sorted_posts:
-#         response.append({
-#             "id": post['id'],
-#             "title": post['title'],
-#             "content": post['content']
-#         })
-#
-#     return jsonify(response)
-
-
-
-
-# @app.route('/api/posts', methods=['GET'])
-# def sorted_posts():
-#     sort_param = request.args.get('sort')
-#     direction_param = request.args.get('direction')
-#
-#     if sort_param == 'title':
-#         posts = sorted(POSTS, key=lambda p: p['title'])
-#     elif sort_param == 'content':
-#         posts = sorted(POSTS, key=lambda p: p['content'])
-#     else:
-#         posts = POSTS
-#
-#     if direction_param == 'desc':
-#         posts.reverse()
-#
-#     return {'posts': posts}
-
-
-
+# runs the Flask application when the Python script is executed directly,
+# starting the server on host="0.0.0.0" and port=5002 with debug mode enabled.
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5002, debug=True)
